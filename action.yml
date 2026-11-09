@@ -1,0 +1,106 @@
+name: Perimetry Cloud audit gate
+description: Run (or read) a Perimetry Cloud audit of a proved domain and fail the job when the score drops, falls below a minimum, or a critical finding appears.
+author: Perimetry Cloud
+branding:
+  icon: shield
+  color: blue
+
+inputs:
+  api-key:
+    description: A Perimetry Cloud API key, from a secret (Settings › API keys). Read-only is enough with mode "latest"; mode "run" needs a key that can start audits.
+    required: true
+  domain:
+    description: The proved domain (example.com) or its id.
+    required: true
+  mode:
+    description: run (start an audit and wait for it) or latest (read the latest audit).
+    default: run
+  timeout-minutes:
+    description: How long to wait for the audit, in minutes.
+    default: '15'
+  min-score:
+    description: Fail when the score is below this value (0-100). Empty for no minimum.
+    default: ''
+  fail-on-drop:
+    description: Fail when the score is lower than at the previous audit.
+    default: 'true'
+  max-drop:
+    description: Points the score may lose before fail-on-drop fails.
+    default: '0'
+  fail-on-new:
+    description: Fail when a new finding at or above this severity appears (critical, high, medium, low, info or none).
+    default: critical
+  fail-on-open:
+    description: Fail when any open finding is at or above this severity (critical, high, medium, low, info or none).
+    default: none
+  on-too-soon:
+    description: When an audit on demand ran too recently for the plan, latest (read the latest audit) or fail.
+    default: latest
+  lang:
+    description: Language of finding titles in the summary (en or fr).
+    default: en
+  api-url:
+    description: The address of Perimetry Cloud.
+    default: https://app.perimetry.cloud
+
+outputs:
+  passed:
+    description: true when the gate passed.
+    value: ${{ steps.gate.outputs.passed }}
+  score:
+    description: Score of the audit (0-100).
+    value: ${{ steps.gate.outputs.score }}
+  grade:
+    description: Grade of the audit (A to F).
+    value: ${{ steps.gate.outputs.grade }}
+  previous-score:
+    description: Score of the previous audit (empty for a first audit).
+    value: ${{ steps.gate.outputs.previous-score }}
+  score-delta:
+    description: Change of the score since the previous audit.
+    value: ${{ steps.gate.outputs.score-delta }}
+  new-findings:
+    description: Number of findings new since the previous audit.
+    value: ${{ steps.gate.outputs.new-findings }}
+  report-url:
+    description: Address of the domain's report in Perimetry Cloud.
+    value: ${{ steps.gate.outputs.report-url }}
+  result-file:
+    description: Path of the JSON result.
+    value: ${{ steps.gate.outputs.result-file }}
+
+runs:
+  using: composite
+  steps:
+    - id: gate
+      shell: bash
+      # Inputs reach the command through the environment only, never inside the script (no injection), and the
+      # key only as PERIMETRY_API_KEY: the CLI never prints it, and GitHub masks a secret in the logs anyway.
+      env:
+        PERIMETRY_API_KEY: ${{ inputs.api-key }}
+        PERIMETRY_API_URL: ${{ inputs.api-url }}
+        PERIMETRY_DOMAIN: ${{ inputs.domain }}
+        IN_MODE: ${{ inputs.mode }}
+        IN_TIMEOUT: ${{ inputs.timeout-minutes }}
+        IN_MIN_SCORE: ${{ inputs.min-score }}
+        IN_FAIL_ON_DROP: ${{ inputs.fail-on-drop }}
+        IN_MAX_DROP: ${{ inputs.max-drop }}
+        IN_FAIL_ON_NEW: ${{ inputs.fail-on-new }}
+        IN_FAIL_ON_OPEN: ${{ inputs.fail-on-open }}
+        IN_ON_TOO_SOON: ${{ inputs.on-too-soon }}
+        IN_LANG: ${{ inputs.lang }}
+      run: |
+        set -u
+        case "$IN_TIMEOUT" in ''|*[!0-9]*) echo "::error title=Perimetry Cloud::timeout-minutes must be a whole number"; exit 2 ;; esac
+        args=(check --mode "$IN_MODE" --timeout "$((IN_TIMEOUT * 60))" --fail-on-drop "$IN_FAIL_ON_DROP" --max-drop "$IN_MAX_DROP"
+              --fail-on-new "$IN_FAIL_ON_NEW" --fail-on-open "$IN_FAIL_ON_OPEN" --on-too-soon "$IN_ON_TOO_SOON" --lang "$IN_LANG"
+              --json "$RUNNER_TEMP/perimetry-result.json")
+        if [ -n "$IN_MIN_SCORE" ]; then args+=(--min-score "$IN_MIN_SCORE"); fi
+        # The CLI shipped with the action, and nothing else: never a package fetched by name at run time, which would
+        # receive the key (./ci, shipped next to action.yml).
+        cli="$GITHUB_ACTION_PATH/ci/bin/perimetry-ci.mjs"
+        if [ ! -f "$cli" ]; then
+          echo "::error title=Perimetry Cloud::The command of this action (ci/bin/perimetry-ci.mjs) is missing next to action.yml: this copy of the action is incomplete. Use a published version of the action."
+          exit 2
+        fi
+        node "$cli" "${args[@]}"

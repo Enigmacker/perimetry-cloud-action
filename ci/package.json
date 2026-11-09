@@ -1,0 +1,14 @@
+{
+  "name": "perimetry-cloud-ci",
+  "version": "0.1.0",
+  "description": "Perimetry Cloud in CI: run or read an audit of a proved domain and fail the build when the score drops or a critical finding appears.",
+  "private": true,
+  "type": "module",
+  "license": "UNLICENSED",
+  "bin": { "perimetry-ci": "bin/perimetry-ci.mjs" },
+  "files": ["bin", "src", "README.md"],
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  }
+}
