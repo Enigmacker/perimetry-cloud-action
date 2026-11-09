@@ -1,5 +1,5 @@
 name: Perimetry Cloud audit gate
-description: Run (or read) a Perimetry Cloud audit of a proved domain and fail the job when the score drops, falls below a minimum, or a critical finding appears.
+description: Fail the job when a domain's Perimetry Cloud score drops, falls below a minimum, or a critical finding appears.
 author: Perimetry Cloud
 branding:
   icon: shield
