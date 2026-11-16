@@ -4,7 +4,7 @@ import { parseArgs } from 'node:util';
 import { appendFile, writeFile } from 'node:fs/promises';
 import { createClient, ApiError } from './client.mjs';
 import { evaluate, SEVERITIES } from './gate.mjs';
-import { markdownSummary, consoleSummary } from './summary.mjs';
+import { markdownSummary, consoleSummary, line } from './summary.mjs';
 
 export const VERSION = '0.1.0';
 
@@ -174,7 +174,7 @@ export async function main(argv = process.argv.slice(2), env = process.env, { lo
     return code;
   } catch (e) {
     const timeout = e instanceof Timeout;
-    const msg = e instanceof ApiError ? `${e.message}${e.status ? ` (HTTP ${e.status}${e.code ? `, ${e.code}` : ''})` : ''}` : timeout ? e.message : `unexpected error: ${String(e?.message ?? e).slice(0, 200)}`;
+    const msg = e instanceof ApiError ? `${line(e.message)}${e.status ? ` (HTTP ${e.status}${e.code ? `, ${e.code}` : ''})` : ''}` : timeout ? e.message : `unexpected error: ${line(e?.message ?? e, 200)}`;
     error(`perimetry-ci: ${msg}`);
     if (o.summary) await appendFile(o.summary, `### Perimetry Cloud — ${timeout ? '⏱️ Timed out' : '⚠️ Error'}\n\n${msg.replace(/[<>|`*_[\]]/g, (c) => `\\${c}`)}\n\n`).catch(() => {});
     if (env.GITHUB_OUTPUT) await appendFile(env.GITHUB_OUTPUT, 'passed=false\n').catch(() => {});

@@ -3,6 +3,12 @@
 
 const CONTROL = /[\u0000-\u001f\u007f-\u009f‪-‮⁦-⁩]/g;
 
+/** One console line: control characters (line breaks included) become spaces, so that text from the
+ *  API can never start a new line, and so never a workflow command (`::…`). Bounded. */
+export function line(value, max = 300) {
+  return String(value ?? '').replace(CONTROL, ' ').slice(0, max);
+}
+
 /** Plain text for one table cell or line of Markdown: no markup, no HTML, no line break, bounded. */
 export function md(value, max = 160) {
   let s = String(value ?? '').replace(CONTROL, ' ').replace(/\s+/g, ' ').trim();
@@ -51,9 +57,9 @@ export function consoleSummary(result) {
   const out = [];
   const delta = result.scoreDelta == null ? '' : ` (${result.scoreDelta > 0 ? '+' : ''}${result.scoreDelta})`;
   out.push(`Perimetry Cloud: ${md(result.domain.name, 253)}: score ${result.audit.score}, grade ${result.audit.grade}${delta}.`);
-  if (result.notice) out.push(result.notice);
+  if (result.notice) out.push(`Note: ${line(result.notice)}`);
   for (const f of (result.newFindings ?? []).slice(0, 10)) out.push(`  new ${f.severity}: ${String(f.title).replace(CONTROL, ' ').slice(0, 160)} (${String(f.target).replace(CONTROL, ' ').slice(0, 120)})`);
   out.push(result.passed ? 'Passed.' : `Failed: ${result.reasons.join('; ')}.`);
-  if (result.links?.app) out.push(`Report: ${result.links.app}`);
+  if (result.links?.app) out.push(`Report: ${line(result.links.app, 500)}`);
   return out.join('\n');
 }
